@@ -1,3 +1,5 @@
+pub mod arp_tokenizer;
+
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
@@ -5,8 +7,6 @@ use arp_tokenizer::ArpToken;
 use rand::seq::IteratorRandom;
 use rand::{distributions::Standard, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-
-mod arp_tokenizer;
 
 pub const AUTORP: &str = include_str!("../resources/Autorp.txt");
 
@@ -84,15 +84,12 @@ impl<'a, 'b> AutoRPParserCtx<'a, 'b> {
 }
 
 impl AutoRP {
-    fn match_on_nodes<'a, R>(
+    fn match_on_nodes<'a>(
         &'a self,
         prev: &'a str,
         word: &'a str,
-        rng: &mut R,
-    ) -> Option<MatchResult<'a>>
-    where
-        R: Rng + Sized,
-    {
+        rng: &mut impl Rng,
+    ) -> Option<MatchResult<'a>> {
         self.word_replacements["1"]
             .iter()
             .flat_map(|n| {
@@ -162,18 +159,6 @@ impl AutoRP {
     }
 }
 
-impl WordReplacement {
-    fn is_chance(&self, rng: &mut impl Rng) -> bool {
-        if self.chance == 1 {
-            return true;
-        }
-        let rand: f32 = rng.sample(Standard);
-        let chance = 1. / self.chance as f32;
-
-        chance < rand
-    }
-}
-
 trait SetChoose<T> {
     fn choose<R>(&self, rng: &mut R) -> &T
     where
@@ -201,6 +186,15 @@ enum MatchKind<'a> {
 }
 
 impl WordReplacement {
+    fn is_chance(&self, rng: &mut impl Rng) -> bool {
+        if self.chance == 1 {
+            return true;
+        }
+        let rand: f32 = rng.sample(Standard);
+        let chance = 1. / self.chance as f32;
+
+        chance < rand
+    }
     fn matches<'a>(&self, current: &'a str, next: &'a str) -> Option<MatchKind<'a>> {
         if !self.prev.is_empty() {
             if self.prev.contains(current) && self.word.contains(next) {
@@ -217,15 +211,12 @@ impl WordReplacement {
         return None;
     }
 
-    fn translate<'a, R>(
+    fn translate<'a>(
         &self,
         current: &'a str,
         next: &'a str,
-        rng: &mut R,
-    ) -> Option<(MatchKind<'a>, String)>
-    where
-        R: Rng + Sized,
-    {
+        rng: &mut impl Rng,
+    ) -> Option<(MatchKind<'a>, String)> {
         match self.matches(current, next) {
             None => return None,
             Some(kind) => {
