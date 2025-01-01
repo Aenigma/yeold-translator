@@ -6,19 +6,17 @@ use nom::character::complete::*;
 use nom::combinator::map;
 use nom::error::ErrorKind;
 use nom::multi::many0;
-use nom::{sequence::preceded, IResult};
+/// This module provides functionality for tokenizing ARP (Address Resolution Protocol) data.
+/// It uses the `nom` crate for parsing sequences of bytes.
+///
+/// The `preceded` combinator from `nom::sequence` is used to parse input that is preceded by a specific pattern.
+/// The `IResult` type is used to represent the result of a parsing operation, which can be either a success or an error.
+use nom::IResult;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ArpToken<'a> {
     Ws(&'a str),
     Word(&'a str),
-    Template(&'a str),
-}
-
-fn parse_template(input: &str) -> IResult<&str, ArpToken> {
-    map(preceded(char('&'), alpha1), |s: &str| {
-        ArpToken::Template(&s[1..])
-    })(input)
 }
 
 fn parse_ws(input: &str) -> IResult<&str, ArpToken> {
@@ -26,7 +24,7 @@ fn parse_ws(input: &str) -> IResult<&str, ArpToken> {
 }
 
 fn parse_word(input: &str) -> IResult<&str, ArpToken> {
-    if input.len() == 0 {
+    if input.is_empty() {
         return Err(nom::Err::Error(nom::error::Error::new(
             "Nothing to consume",
             ErrorKind::Eof,
@@ -36,5 +34,50 @@ fn parse_word(input: &str) -> IResult<&str, ArpToken> {
 }
 
 pub fn parse(input: &str) -> IResult<&str, Vec<ArpToken>> {
-    many0(alt((parse_ws, parse_template, parse_word)))(input)
+    many0(alt((parse_ws, parse_word)))(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_ws() {
+        assert_eq!(parse_ws("   "), Ok(("", ArpToken::Ws("   "))));
+        assert_eq!(parse_ws("\t"), Ok(("", ArpToken::Ws("\t"))));
+        assert_eq!(parse_ws("\n"), Ok(("", ArpToken::Ws("\n"))));
+    }
+
+    #[test]
+    fn test_parse_word() {
+        assert_eq!(parse_word("hello"), Ok(("", ArpToken::Word("hello"))));
+        assert_eq!(parse_word("world "), Ok((" ", ArpToken::Word("world"))));
+        assert_eq!(parse_word("rust"), Ok(("", ArpToken::Word("rust"))));
+    }
+
+    #[test]
+    fn test_parse() {
+        assert_eq!(
+            parse("hello world"),
+            Ok((
+                "",
+                vec![
+                    ArpToken::Word("hello"),
+                    ArpToken::Ws(" "),
+                    ArpToken::Word("world")
+                ]
+            ))
+        );
+        assert_eq!(
+            parse("rust  programming"),
+            Ok((
+                "",
+                vec![
+                    ArpToken::Word("rust"),
+                    ArpToken::Ws("  "),
+                    ArpToken::Word("programming")
+                ]
+            ))
+        );
+    }
 }

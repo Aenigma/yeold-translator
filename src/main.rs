@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use yeold::{AutoRP, AUTORP};
+use yeold::autorp::{AutoRP, AUTORP};
 
 fn main() {
     let arp = keyvalues_serde::from_str::<AutoRP>(AUTORP).unwrap();
