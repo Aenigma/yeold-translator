@@ -1,9 +1,26 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use rand::thread_rng;
+
+use crate::autorp::WordReplacement;
+
 pub trait TemplateMap {
     fn get<'a>(&self, input: &'a str) -> Option<Cow<str>>;
 }
+
+impl TemplateMap for Vec<WordReplacement> {
+    fn get<'a>(&self, input: &'a str) -> Option<Cow<str>> {
+        let mut rng = thread_rng();
+        for wr in self {
+            if let Some(s) = wr.simple_get(input, &mut rng) {
+                return Some(Cow::Borrowed(s));
+            }
+        }
+        None
+    }
+}
+
 /// Trait representing a map that can be used for template substitution.
 impl TemplateMap for HashMap<String, String> {
     /// Retrieves the value corresponding to the given key from the map.

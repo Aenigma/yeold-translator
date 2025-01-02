@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::arp_tokenizer;
+use crate::template_string::template_evaluate;
 
 pub const AUTORP: &str = include_str!("../resources/Autorp.txt");
 
@@ -90,10 +91,28 @@ impl<'a, 'b> AutoRPParserCtx<'a, 'b> {
     }
 }
 
-/// The `AutoRP` struct is used to handle automatic role-playing text transformations.
-/// It contains mappings for prepended words, appended words, and word replacements.
+/// The `AutoRP` struct provides methods for translating and processing strings
+/// with word replacements and additional text manipulation features.
+///
+/// # Methods
+///
+/// - `match_on_nodes`: Matches nodes based on previous and current words, and returns a `MatchResult`.
+/// - `default`: Returns a new `AutoRP` instance with default values.
+/// - `prepend`: Prepends a word to the string based on certain conditions.
+/// - `append`: Appends a word to the string based on certain conditions.
+/// - `translate_postprocess`: Translates the input string and optionally prepends/appends words.
+/// - `translate`: Translates the input string using the `AutoRP` instance.
+///
+/// # Example
+/// ```
+/// use yeold::autorp::AutoRP;
+/// let autorp = AutoRP::default();
+/// let translated = autorp.translate("Hello, world!");
+/// println!("{}", translated);
+/// ```
 #[wasm_bindgen]
 impl AutoRP {
+    /// Matches nodes based on previous and current words, and returns a `MatchResult`.
     fn match_on_nodes<'a>(
         &'a self,
         prev: &'a str,
@@ -123,6 +142,59 @@ impl AutoRP {
     #[wasm_bindgen]
     pub fn default() -> Self {
         keyvalues_serde::from_str::<AutoRP>(AUTORP).unwrap()
+    }
+
+    /// Generate a prepended word 50% of the time.
+    fn prepend(&self, rng: &mut impl Rng) -> Cow<str> {
+        if self.prepended_words.is_empty() || rng.gen::<bool>() {
+            return Default::default();
+        }
+
+        Cow::Borrowed(self.prepended_words.keys().choose(rng).unwrap())
+    }
+
+    /// Generate an appended word 50% of the time.
+    fn append(&self, rng: &mut impl Rng) -> Cow<str> {
+        if self.appended_words.is_empty() || rng.gen::<bool>() {
+            return Default::default();
+        }
+
+        Cow::Borrowed(self.appended_words.keys().choose(rng).unwrap())
+    }
+
+    /// Translates the input string and optionally prepends/appends words.
+    #[wasm_bindgen]
+    pub fn translate_postprocess(&self, input: &str, prepend: bool, append: bool) -> String {
+        let translated = self.translate(input);
+
+        if !prepend && !append {
+            return translated;
+        }
+
+        let mut rng = thread_rng();
+
+        let evaluated = template_evaluate(&translated, &self.word_replacements["1"]);
+
+        let prepend = if prepend {
+            self.prepend(&mut rng)
+        } else {
+            Cow::default()
+        };
+        let prepend = template_evaluate(&prepend, &self.word_replacements["1"]);
+
+        let append = if append && translated.ends_with(|c: char| c.is_ascii_punctuation()) {
+            format!(" {}", self.append(&mut rng))
+        } else {
+            String::default()
+        };
+        let append = template_evaluate(&append, &self.word_replacements["1"]);
+
+        // If nothing was changed, return the buf as-is.
+        if prepend.is_empty() && matches!(evaluated, Cow::Borrowed(_)) && append.is_empty() {
+            return translated;
+        }
+
+        format!("{}{}{}", prepend, evaluated, append)
     }
 
     /// Translates the input string using the `AutoRP` instance.
@@ -237,6 +309,20 @@ impl WordReplacement {
             return Some(MatchKind::Plural(next));
         }
         return None;
+    }
+
+    pub fn simple_get(&self, current: &str, rng: &mut impl Rng) -> Option<&str> {
+        if self.word.contains(current) {
+            return self.replacement.iter().choose(rng).map(|s| s.as_str());
+        }
+        if self.word_plural.contains(current) {
+            return self
+                .replacement_plural
+                .iter()
+                .choose(rng)
+                .map(|s| s.as_str());
+        }
+        None
     }
 
     /// Translates the current and next words if they match the `WordReplacement`.

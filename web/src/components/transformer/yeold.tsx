@@ -1,7 +1,9 @@
 import React, { useCallback, useReducer } from "react";
+
+import { AutoRP } from "yeold";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { AutoRP } from "yeold";
 
 const arp = AutoRP.default();
 
@@ -20,7 +22,7 @@ function arpReducer(
 
   return {
     input: action,
-    output: arp.translate(action),
+    output: arp.translate_postprocess(action, true, true),
   };
 }
 
@@ -37,7 +39,9 @@ const YeoldTransformer = () => {
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold">Yeold Text Transformer</CardTitle>
+        <CardTitle className="text-2xl font-bold">
+          Yeold Text Transformer
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
