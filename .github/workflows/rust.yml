@@ -29,17 +29,20 @@ jobs:
       - name: Build WASM
         run: wasm-pack build --target browser
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: web/package.json
-          run_install: |
-            - cwd: web
+
+      - name: Install Web Dependencies
+        working-directory: ./web
+        run: pnpm i --frozen-lockfile
 
       - name: Build Web
         working-directory: ./web
